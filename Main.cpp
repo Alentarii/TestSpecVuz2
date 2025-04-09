@@ -35,9 +35,7 @@ int main(int argc, char** argv) {
 
             void* context = zmq_ctx_new();
             void* sender = zmq_socket(context, ZMQ_PUSH);
-            zmq_bind(sender, "tcp://localhost:5050");
-            // We receive the first message and discard it since it's the
-            // signal start of batch which is -1.
+            zmq_connect(sender, "tcp://localhost:5050");
 
             int count = 0;
             while (!paths.empty())
@@ -54,7 +52,7 @@ int main(int argc, char** argv) {
             }
             zmq_close(sender);            
 
-            // Let's initialize a socket to send the messages.
+
             void* receiver = zmq_socket(context, ZMQ_PULL);
             zmq_connect(receiver, "tcp://localhost:4040");
 
