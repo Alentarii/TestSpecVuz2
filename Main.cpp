@@ -10,6 +10,8 @@
 
 void getRecurs(std::queue<std::string>&, const std::string&);
 void Arhivator(std::string);
+int send(std::queue<std::string>&);
+std::queue<std::string> get(int);
 
 
 int main(int argc, char** argv) {
@@ -25,6 +27,7 @@ int main(int argc, char** argv) {
 
         for (int i = 1; i < argc; i++) {
 
+            //std::string put = argc[i]; //получаем путь
             std::string put = "D:\\testFlash"; //получаем путь
 
 			std::cout << "Ваш путь: " << put << std::endl;
@@ -33,48 +36,9 @@ int main(int argc, char** argv) {
 
 			getRecurs(paths, put); //рекурсивно получаем файлы
 
-            void* context = zmq_ctx_new();
-            void* sender = zmq_socket(context, ZMQ_PUSH);
-            zmq_connect(sender, "tcp://localhost:5050");
+            paths = get(send(paths));
+            
 
-            int count = 0;
-            while (!paths.empty())
-            {
-                zmq_msg_t message;
-                const char* ssend = "paths.";
-                int t_length = strlen(ssend);
-                zmq_msg_init_size(&message, t_length);
-                memcpy(zmq_msg_data(&message), ssend, t_length);
-                zmq_msg_send(&message, sender, 0);
-                zmq_msg_close(&message);
-
-
-            }
-            zmq_close(sender);            
-
-
-            void* receiver = zmq_socket(context, ZMQ_PULL);
-            zmq_connect(receiver, "tcp://localhost:4040");
-
-            for (int count = 0; count < 10; count++) {
-
-                zmq_msg_t reply;
-                zmq_msg_init(&reply);
-                zmq_msg_recv(&reply, receiver, 0);
-                int length = zmq_msg_size(&reply);
-                char* value = new char[length + 1];
-                memcpy(value, zmq_msg_data(&reply), length);
-
-                printf("%s\n", value);
-                free(value);
-
-                zmq_msg_close(&reply);
-            }
-
-            zmq_close(receiver);
-            zmq_ctx_destroy(context);
-
-             /*
 			if (!paths.empty()) {
 
 				int cores_count = std::thread::hardware_concurrency(); //Узнаем кол-во ядер
@@ -82,7 +46,7 @@ int main(int argc, char** argv) {
 				Thread_pool t(cores_count);
 				while (!paths.empty()) {
 
-					std::cout << paths.front() << std::endl;
+					std::cout << paths.front() << std::endl;///////////////
 
 					t.add_task(Arhivator, paths.front());  //потоки пошли в бой
 					paths.pop();
@@ -90,7 +54,7 @@ int main(int argc, char** argv) {
 
 				t.wait_all();
 				std::cout << "Готово!";
-			}*/
+			}
 
         }
 
@@ -131,4 +95,76 @@ void Arhivator(std::string path) { //выполняем архивировани
         std::cout << error_message << std::endl;
     }
     
+}
+
+int send(std::queue<std::string>& paths) { //отдаем в zmq
+
+    int count = paths.size();
+
+    void* context = zmq_ctx_new();
+    void* sender = zmq_socket(context, ZMQ_PUSH);
+    zmq_connect(sender, "tcp://localhost:5050");
+
+
+    zmq_msg_t message;
+
+    std::ostringstream stringStream;
+    stringStream << count;
+    std::string s = stringStream.str();
+    const char* ssend = s.c_str();
+
+    int t_length = strlen(ssend);
+    zmq_msg_init_size(&message, t_length);
+    memcpy(zmq_msg_data(&message), ssend, t_length);
+    zmq_msg_send(&message, sender, 0);
+    zmq_msg_close(&message);
+
+    while (!paths.empty())
+    {
+        zmq_msg_t message;
+        const char* ssend = paths.front().c_str();
+        int t_length = strlen(ssend);
+        zmq_msg_init_size(&message, t_length);
+        memcpy(zmq_msg_data(&message), ssend, t_length);
+        zmq_msg_send(&message, sender, 0);
+        zmq_msg_close(&message);
+
+        paths.pop();
+    }
+    zmq_close(sender);
+    zmq_ctx_destroy(context);
+
+    return count;
+
+}
+
+std::queue<std::string> get(int count) { //получаем из zmq
+    
+    std::queue<std::string> paths;
+
+    void* context = zmq_ctx_new();
+    void* receiver = zmq_socket(context, ZMQ_PULL);
+    zmq_bind(receiver, "tcp://localhost:4040");
+
+    
+    for (int i = 0; i < count; i++) {
+
+        zmq_msg_t reply;
+        zmq_msg_init(&reply);
+        zmq_msg_recv(&reply, receiver, 0);
+
+        int length = zmq_msg_size(&reply);
+        char* msg = new char[length + 1];
+        memcpy(msg, zmq_msg_data(&reply), length);
+        paths.push(msg);
+
+        zmq_msg_close(&reply);
+    }
+
+    zmq_close(receiver);
+    zmq_ctx_destroy(context);
+
+
+    return paths;
+
 }
