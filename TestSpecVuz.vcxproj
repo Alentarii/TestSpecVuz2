@@ -136,6 +136,8 @@
   <ItemGroup>
     <ClInclude Include="resource.h" />
     <ClInclude Include="shared_mq.hpp" />
+    <ClInclude Include="Task.h" />
+    <ClInclude Include="ThreadPool.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="TestSpecVuz.rc" />

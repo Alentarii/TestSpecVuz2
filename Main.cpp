@@ -36,8 +36,7 @@ int main(int argc, char** argv) {
 
 			getRecurs(paths, put); //рекурсивно получаем файлы
 
-            paths = get(send(paths));
-            
+            paths = get(send(paths));            
 
 			if (!paths.empty()) {
 
@@ -87,7 +86,7 @@ void Arhivator(std::string path) { //выполняем архивировани
 
     try {
         std::string compressedFile = path;
-        size_t start{ compressedFile.find_first_of(".") }; // Находим конец подстроки
+        size_t start{ compressedFile.find_last_of(".") }; // Находим конец подстроки
         compressedFile.insert(start, "_compress");    
         std::string output = ht.compressFile(path, compressedFile);
     }
@@ -123,6 +122,7 @@ int send(std::queue<std::string>& paths) { //отдаем в zmq
     {
         zmq_msg_t message;
         const char* ssend = paths.front().c_str();
+        //zmq_send(sender, strdup(ssend), strlen(ssend), 0);
         int t_length = strlen(ssend);
         zmq_msg_init_size(&message, t_length);
         memcpy(zmq_msg_data(&message), ssend, t_length);
@@ -139,6 +139,8 @@ int send(std::queue<std::string>& paths) { //отдаем в zmq
 }
 
 std::queue<std::string> get(int count) { //получаем из zmq
+
+    
     
     std::queue<std::string> paths;
 
@@ -150,13 +152,17 @@ std::queue<std::string> get(int count) { //получаем из zmq
     for (int i = 0; i < count; i++) {
 
         zmq_msg_t reply;
-        zmq_msg_init(&reply);
-        zmq_msg_recv(&reply, receiver, 0);
 
-        int length = zmq_msg_size(&reply);
-        char* msg = new char[length + 1];
-        memcpy(msg, zmq_msg_data(&reply), length);
-        paths.push(msg);
+        char buffer[256];
+        int size = zmq_recv(receiver, buffer, 255, 0);
+        if (size == -1)
+            return paths;
+        if (size > 255)
+            size = 255;
+        buffer[size] = '\0';
+
+        paths.push(buffer);
+        std::cout << buffer << std::endl;
 
         zmq_msg_close(&reply);
     }
