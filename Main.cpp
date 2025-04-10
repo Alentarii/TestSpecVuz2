@@ -18,8 +18,6 @@ int main(int argc, char** argv) {
 
     setlocale(LC_ALL, "rus");
 
-    argc = 2;//////////////
-
     if (argc == 1) { // если в аргументах только имя программы
         std::cout << "Вы не ввели путь" << std::endl; // выводим, что нет аргументов
     }
@@ -27,8 +25,7 @@ int main(int argc, char** argv) {
 
         for (int i = 1; i < argc; i++) {
 
-            //std::string put = argc[i]; //получаем путь
-            std::string put = "D:\\testFlash"; //получаем путь
+            std::string put = argv[i]; //получаем путь
 
 			std::cout << "Ваш путь: " << put << std::endl;
 
@@ -45,7 +42,7 @@ int main(int argc, char** argv) {
 				Thread_pool t(cores_count);
 				while (!paths.empty()) {
 
-					std::cout << paths.front() << std::endl;///////////////
+					std::cout << paths.front() << std::endl;
 
 					t.add_task(Arhivator, paths.front());  //потоки пошли в бой
 					paths.pop();
@@ -104,20 +101,6 @@ int send(std::queue<std::string>& paths) { //отдаем в zmq
     void* sender = zmq_socket(context, ZMQ_PUSH);
     zmq_connect(sender, "tcp://localhost:5050");
 
-
-    zmq_msg_t message;
-
-    std::ostringstream stringStream;
-    stringStream << count;
-    std::string s = stringStream.str();
-    const char* ssend = s.c_str();
-
-    int t_length = strlen(ssend);
-    zmq_msg_init_size(&message, t_length);
-    memcpy(zmq_msg_data(&message), ssend, t_length);
-    zmq_msg_send(&message, sender, 0);
-    zmq_msg_close(&message);
-
     while (!paths.empty())
     {
         zmq_msg_t message;
@@ -131,6 +114,17 @@ int send(std::queue<std::string>& paths) { //отдаем в zmq
 
         paths.pop();
     }
+
+    zmq_msg_t message;
+    const char* ssend = "0";
+    int t_length = strlen(ssend);
+    zmq_msg_init_size(&message, t_length);
+    memcpy(zmq_msg_data(&message), ssend, t_length);
+
+    zmq_msg_send(&message, sender, 0);
+
+    zmq_msg_close(&message);
+
     zmq_close(sender);
     zmq_ctx_destroy(context);
 
@@ -138,9 +132,7 @@ int send(std::queue<std::string>& paths) { //отдаем в zmq
 
 }
 
-std::queue<std::string> get(int count) { //получаем из zmq
-
-    
+std::queue<std::string> get(int count) { //получаем из zmq    
     
     std::queue<std::string> paths;
 
@@ -149,7 +141,7 @@ std::queue<std::string> get(int count) { //получаем из zmq
     zmq_bind(receiver, "tcp://localhost:4040");
 
     
-    for (int i = 0; i < count; i++) {
+    for (;;) {
 
         zmq_msg_t reply;
 
@@ -161,8 +153,10 @@ std::queue<std::string> get(int count) { //получаем из zmq
             size = 255;
         buffer[size] = '\0';
 
+        if (buffer[0] == '0')
+            break;
+
         paths.push(buffer);
-        std::cout << buffer << std::endl;
 
         zmq_msg_close(&reply);
     }
