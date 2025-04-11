@@ -27,30 +27,30 @@ int main(int argc, char** argv) {
 
             std::string put = argv[i]; //получаем путь
 
-			std::cout << "Ваш путь: " << put << std::endl;
+            std::cout << "Ваш путь: " << put << std::endl;
 
-			std::queue<std::string> paths;
+            std::queue<std::string> paths;
 
-			getRecurs(paths, put); //рекурсивно получаем файлы
+            getRecurs(paths, put); //рекурсивно получаем файлы
 
-            paths = get(send(paths));            
+            paths = get(send(paths));
 
-			if (!paths.empty()) {
+            if (!paths.empty()) {
 
-				int cores_count = std::thread::hardware_concurrency(); //Узнаем кол-во ядер
+                int cores_count = std::thread::hardware_concurrency(); //Узнаем кол-во ядер
 
-				Thread_pool t(cores_count);
-				while (!paths.empty()) {
+                Thread_pool t(cores_count);
+                while (!paths.empty()) {
 
-					std::cout << paths.front() << std::endl;
+                    std::cout << paths.front() << std::endl;
 
-					t.add_task(Arhivator, paths.front());  //потоки пошли в бой
-					paths.pop();
-				}
+                    t.add_task(Arhivator, paths.front());  //потоки пошли в бой
+                    paths.pop();
+                }
 
-				t.wait_all();
-				std::cout << "Готово!";
-			}
+                t.wait_all();
+                std::cout << "Готово!";
+            }
 
         }
 
@@ -84,13 +84,13 @@ void Arhivator(std::string path) { //выполняем архивировани
     try {
         std::string compressedFile = path;
         size_t start{ compressedFile.find_last_of(".") }; // Находим конец подстроки
-        compressedFile.insert(start, "_compress");    
+        compressedFile.insert(start, "_compress");
         std::string output = ht.compressFile(path, compressedFile);
     }
     catch (const char* error_message) {
         std::cout << error_message << std::endl;
     }
-    
+
 }
 
 int send(std::queue<std::string>& paths) { //отдаем в zmq
@@ -105,7 +105,6 @@ int send(std::queue<std::string>& paths) { //отдаем в zmq
     {
         zmq_msg_t message;
         const char* ssend = paths.front().c_str();
-        //zmq_send(sender, strdup(ssend), strlen(ssend), 0);
         int t_length = strlen(ssend);
         zmq_msg_init_size(&message, t_length);
         memcpy(zmq_msg_data(&message), ssend, t_length);
@@ -115,16 +114,6 @@ int send(std::queue<std::string>& paths) { //отдаем в zmq
         paths.pop();
     }
 
-    zmq_msg_t message;
-    const char* ssend = "0";
-    int t_length = strlen(ssend);
-    zmq_msg_init_size(&message, t_length);
-    memcpy(zmq_msg_data(&message), ssend, t_length);
-
-    zmq_msg_send(&message, sender, 0);
-
-    zmq_msg_close(&message);
-
     zmq_close(sender);
     zmq_ctx_destroy(context);
 
@@ -133,14 +122,14 @@ int send(std::queue<std::string>& paths) { //отдаем в zmq
 }
 
 std::queue<std::string> get(int count) { //получаем из zmq    
-    
+
     std::queue<std::string> paths;
 
     void* context = zmq_ctx_new();
     void* receiver = zmq_socket(context, ZMQ_PULL);
-    zmq_bind(receiver, "tcp://localhost:4040");
+    zmq_bind(receiver, "tcp://localhost:6060");
 
-    
+
     for (;;) {
 
         zmq_msg_t reply;
@@ -157,6 +146,7 @@ std::queue<std::string> get(int count) { //получаем из zmq
             break;
 
         paths.push(buffer);
+        std::cout << buffer << std::endl;
 
         zmq_msg_close(&reply);
     }
